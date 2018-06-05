@@ -1,0 +1,42 @@
+#+TITLE: Getting started with .NET OpenLR
+Documentation on using OpenLR.
+
+* Introduction to C#/.NET
+The Itinero/OpenLR library is written in C#. To build software using it, you'll need a C# SDK, which can be downloaded from Microsoft: [[https://www.microsoft.com/net/learn/get-started][Get started with .NET]]
+
+C# is a language developed by Microsoft, much like Java. It compiles to the virtual platform known as the CLR (Common Language Runtime). Together with a library of standard classes (FCL) this environment is .NET. The .NET environment runs on all major platforms (Windows, MacOS, Linux, Android...) making applications written in a .NET language (C#, F#, Visual Basic) portable.
+
+If you have successfully installed the .NET SDK you should have the =dotnet= command-line tool.
+
+#+BEGIN_SRC shell :exports both
+dotnet --version
+#+END_SRC
+
+#+RESULTS:
+: 2.1.4
+
+** Creating a new project
+A new project is created using =dotnet new=
+
+#+BEGIN_SRC shell
+dotnet new console --name my-openlr-tool --language C#
+#+END_SRC
+
+Then the new project is run using =dotnet run=
+
+#+BEGIN_SRC shell :exports both
+cd my-openlr-tool
+dotnet run
+#+END_SRC
+
+#+RESULTS:
+: Hello World!
+
+Our console application was initialized with a  friendly "Hello World!".
+
+** Adding OpenLR as dependency
+The .NET environment has two ways of adding external libraries to a project: packages and references. Adding a package will obtain a pre-compiled library from [[https://www.nuget.org/][NuGet]].
+
+#+BEGIN_SRC shell :prologue "cd my-openlr-tool" :results silent
+dotnet add package OpenLR
+#+END_SRC
