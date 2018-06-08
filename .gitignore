@@ -4,3 +4,6 @@
 # c#
 my-openlr-tool/obj
 my-openlr-tool/bin
+
+# pbf files
+*.pbf

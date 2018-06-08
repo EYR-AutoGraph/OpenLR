@@ -32,11 +32,98 @@ dotnet run
 #+RESULTS:
 : Hello World!
 
-Our console application was initialized with a  friendly "Hello World!".
+Our console application was initialized with a  friendly "Hello World!". We will be extending the "Hello World!" example with the first OpenLR example.
+
+#+BEGIN_SRC csharp :tangle my-openlr-tool/Program.cs :noweb no-export
+  using System;
+
+  <<first-example-imports>>
+
+  namespace my_openlr_tool
+  {
+      class Program
+      {
+	  static void Main(string[] args)
+	  {
+	      Console.WriteLine("Hello World!");
+
+	      <<first-example-load-data>>
+	      <<first-example-encode-line>>
+	  }
+      }
+  }
+#+END_SRC
 
 ** Adding OpenLR as dependency
 The .NET environment has two ways of adding external libraries to a project: packages and references. Adding a package will obtain a pre-compiled library from [[https://www.nuget.org/][NuGet]].
 
+Documentation for OpenLR is a bit scarce: [[docs.itinero.tech]].
+
 #+BEGIN_SRC shell :prologue "cd my-openlr-tool" :results silent
 dotnet add package OpenLR
+#+END_SRC
+
+** Import libraries
+#+NAME: first-example-imports
+#+BEGIN_SRC csharp
+  // import File
+  using System.IO;
+
+  // import RouterDb
+  using Itinero;
+  // import method RouterDb.LoadOsmData
+  using Itinero.IO.Osm;
+  // import Vehicle
+  using Itinero.Osm.Vehicles;
+
+  // import Coder
+  using OpenLR;
+  // import OsmCoderProfile
+  using OpenLR.Osm;
+  // import ReferencedLine
+  using OpenLR.Referenced.Locations;
+#+END_SRC
+
+** Running a first example
+The following example encodes and decodes a line in Luxembourg. This loads OSM data from a PBF, which can be found on [[http://download.geofabrik.de/europe/luxembourg.html][GeoFabrik.de]].
+
+*** Load the map
+First we need to load the PBF file into the RouterDB. Loading the Luxembourg data takes a few seconds.
+
+#+NAME: first-example-load-data
+#+BEGIN_SRC csharp
+  Console.Write("Loading Luxembourg ... ");
+  var routerDb = new RouterDb();
+  using (var sourceStream =
+	 File.OpenRead(
+	     Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+			  "../../../luxembourg-latest.osm.pbf")))
+  {
+      routerDb.LoadOsmData(sourceStream, Vehicle.Car);
+  }
+  Console.WriteLine("done");
+#+END_SRC
+
+*** Encode a line
+Next we encode a line between two coordinates and then decode it again.
+
+#+NAME: first-example-encode-line
+#+BEGIN_SRC csharp
+  // create coder.
+  var coder = new Coder(routerDb, new OsmCoderProfile());
+
+  Console.Write("Building a line location, and encoding it ... ");
+  // build a line location from a shortest path.
+  var line = coder.BuildLine(
+      new Itinero.LocalGeo.Coordinate(
+	  49.67218282319583f, 6.142280101776122f),
+      new Itinero.LocalGeo.Coordinate(
+	  49.67776489459803f, 6.1342549324035645f));
+
+  // encode this location.
+  var encoded = coder.Encode(line);
+
+  // decode this location.
+  var decodedLine = coder.Decode(encoded) as ReferencedLine;
+  Console.WriteLine("done");
 #+END_SRC
