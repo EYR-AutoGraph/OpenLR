@@ -139,15 +139,15 @@ Next we encode a line between two coordinates and then decode it again.
 
 Running this example should give the following output:
 
-#+BEGIN_SRC shell :results verbatim
+#+BEGIN_SRC shell :results verbatim :exports results
 cd my-openlr-tool
 dotnet run
 #+END_SRC
 
 #+RESULTS:
-| Hello    | World!     |                          |                    |     |          |                     |
-| Loading  | Luxembourg | ...                      | done               |     |          |                     |
-| Building | a          | line                     | location,          | and | encoding | it.                 |
-| original | line:      | 17060@0%                 | [49.67221,6.14243] | --> | 10712@0% | [49.67784,6.133887] |
-| encoded  | line:      | CwReMiNSjSOYEvyqAjIjaAIG |                    |     |          |                     |
-| decoded  | line:      | 17060@0%                 | [49.67221,6.14243] | --> | 10712@0% | [49.67784,6.133887] |
+: Hello World!
+: Loading Luxembourg ... done
+: Building a line location, and encoding it.
+: original line: 17060@0% [49.67221,6.14243]  --> 10712@0% [49.67784,6.133887]
+: encoded line: CwReMiNSjSOYEvyqAjIjaAIG
+: decoded line: 17060@0% [49.67221,6.14243]  --> 10712@0% [49.67784,6.133887]
