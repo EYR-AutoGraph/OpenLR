@@ -38,7 +38,7 @@ namespace my_openlr_tool
 	    // create coder.
 	    var coder = new Coder(routerDb, new OsmCoderProfile());
 	    
-	    Console.Write("Building a line location, and encoding it ... ");
+	    Console.WriteLine("Building a line location, and encoding it.");
 	    // build a line location from a shortest path.
 	    var line = coder.BuildLine(
 	        new Itinero.LocalGeo.Coordinate(
@@ -46,12 +46,19 @@ namespace my_openlr_tool
 	        new Itinero.LocalGeo.Coordinate(
 	    	49.67776489459803f, 6.1342549324035645f));
 	    
+	    Console.WriteLine("original line: {0} --> {1}",
+	    		  line.StartLocation,
+	    		  line.EndLocation);
+	    
 	    // encode this location.
 	    var encoded = coder.Encode(line);
+	    Console.WriteLine("encoded line: {0}", encoded);
 	    
 	    // decode this location.
 	    var decodedLine = coder.Decode(encoded) as ReferencedLine;
-	    Console.WriteLine("done");
+	    Console.WriteLine("decoded line: {0} --> {1}",
+	    		  decodedLine.StartLocation,
+	    		  decodedLine.EndLocation);
 	}
     }
 }
