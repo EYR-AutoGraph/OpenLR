@@ -1,6 +1,152 @@
 #+TITLE: Getting started with .NET OpenLR
 Documentation on using OpenLR.
 
+* Generics of handling routing data
+** Prerequisites
+- [[https://www.postgresql.org/about/][PostgreSQL]]
+- [[http://www.postgis.net/][PostGIS]]
+- [[https://pgrouting.org/][pgRouting]]
+- [[https://wiki.openstreetmap.org/wiki/Osmosis][Osmosis]]
+
+*** Debian / Ubuntu
+#+BEGIN_SRC shell
+apt install postgresql postgis postgresql-10-pgrouting osmosis
+#+END_SRC
+
+** PostGIS
+PostGIS is built on top of PostgreSQL, which is considered to be the most versatile open source database available. For clarity, all example SQL statements in this document will have /delimited identifiers/. This makes it immediately clear what is SQL syntax and what is an identifier.
+*** PostgreSQL
+
+*** PostGIS
+**** Creating a PostGIS/pgRouting database
+First we have to create the database.
+#+BEGIN_SRC sql
+create database autograph;
+#+END_SRC
+
+Then connect to the new database, either by typing "=\c autograph=" in the =psql= prompt, or from the shell:
+#+BEGIN_SRC shell
+psql -d autograph
+#+END_SRC
+
+Now, from the =psql= prompt we can install the necessary extensions:
+
+#+BEGIN_SRC sql
+create extension postgis;
+create extension pgrouting;
+#+END_SRC
+
+**** Loading OSM data into PostGIS
+Prepare the PostGIS database to accept OSM data. The schema is shipped with the Osmosis installation:
+#+BEGIN_SRC shell
+psql -d autograph -f /usr/share/doc/osmosis/examples/pgsimple_schema_0.6.sql
+#+END_SRC
+
+More on PostGIS schemas can be found at the OSM Wiki: [[https://wiki.openstreetmap.org/wiki/Osm2pgsql/schema]]
+
+Use Osmosis to load OSM data into the database
+#+BEGIN_SRC shell
+osmosis --rb file=netherlands-latest.osm.pbf --ws host="localhost" database="autograph"
+#+END_SRC
+**** Keeping PostGIS up-to-date
+
+*** PGRouting
+** QGIS
+*** Getting a pre-rendered OSM into QGIS
+Add a new layer. Set layer source to:
+#+BEGIN_EXAMPLE
+crs=EPSG:3857&format=&type=xyz&url=http://tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png
+#+END_EXAMPLE
+The CRS will be EPSG:3857, WGS 84 / Pseudo Mercator.
+*** Connecting QGIS to PostGIS
+Connecting to PostGIS is one of the better ways to provide QGIS with large amounts of data. The elephant logo button hides the action of adding a new source from PostGIS to the current rendering.
+
+** Open Street Maps
+*** Osmosis
+Osmosis is a command-line tool to manipulate/filter/extract OSM data.
+
+- [[http://coastalrocket.blogspot.com/2012/09/how-to-get-up-to-date-osm-in-postgis.html][A blog post on keeping a PostGIS database up-to-date.]]
+*** How to get an up-to-date OSM in PostGIS
+#+BEGIN_QUOTE
+How to build an OSM database that is up to date.
+Rather than doing a quarterly manual job of downloading a 14Gb+ file, decompressing it (250Gb+) and inserting it into a database it will be a lot easier to download daily (50Mb) OSM change files (.osc) and apply the changes to the existing database.
+
+The instructions below is a modified version of Martin van Exel's tutorial here - https://docs.google.com/document/pub?id=1paaYsOakgJEYP380R70s4SGYq8ME3ASl-mweVi1DlQ4
+
+# now pop into PostgreSQL and build a suitable database & user (could be tidier)
+adduser osm
+passwd osm
+# and some badly chosen password: osm, osm
+su - postgres psql
+createdb osm
+createlang plpgsql osm
+CREATE USER osm WITH PASSWORD 'osm';
+#CREATE DATABASE osm;
+GRANT ALL PRIVILEGES ON DATABASE osm to osm;
+GRANT ALL PRIVILEGES ON DATABASE osm to postgres;
+\q
+psql -d osm -U osm -f /usr/pgsql-9.1/share/contrib/postgis-2.0/postgis.sql
+psql -d osm -U osm f /usr/pgsql-9.1/share/contrib/postgis-2.0/spatial_ref_sys.sql
+psql -U osm -d osm
+CREATE EXTENSION hstore;
+\q
+psql -U osm -d osm -f /home/<user name>/osm/osmosis-0.41/script/pgsimple_schema_0.6.sql
+
+# make some directories and get some data
+su mkdir /tmp/osm
+cd tmp/osm
+mkdir planet
+mkdir planet/replication
+
+# now get some OSM data - either get the whole planet.. or get a sample from http://download.geofabrik.de/osm/
+cd /tmp/osm/planet/
+wget http://planet.openstreetmap.org/planet-latest.osm.bz2
+
+# and thump into the database (using the VERY IMPORTANT --slim option, -C is how much memory we're setting aside for this: 4Gb in this case) /opt/osm2pgsql/osm2pgsql -S default.style --slim -d osm -C 4000 /tmp/osm/planet/planet-latest.osm.bz2
+
+# create the configuration.txt and download.lock
+osmosis --rrii workingDirectory=/tmp/osm/planet/replication
+
+# create your state.txt file, visit http://toolserver.org/~mazder/replicate-sequences/ and enter details. To check the datetime required examine the contents of the bz2 file.
+
+bunzip2 -c planet-latest.osm.bz2 | head
+
+
+Now at this point I've been running osmosis to grab the change file and osm2pgsql to throw it at the database but you can apparently run osmosis on it's own;
+
+# Osmosis on it's own version
+/opt/osmosis-0.41/bin/osmosis --rri workingDirectory=/tmp/osm/planet/replication --sc --wpc user="osm" database="osm" password="osm"
+
+# Or the two command route - grab a change file from the queue of necessary changes to perform
+/opt/osmosis-0.41/bin/osmosis --rri workingDirectory=/tmp/osm/planet/replication --simplify-change --write-xml-change /tmp/osm/planet/replication/changes.osc.gz
+
+# And append the changes to the database
+/opt/osm2pgsql/osm2pgsql --append -S /opt/osm2pgsql/default.style -d osm -U postgres --slim /tmp/osm/planet/replication/changes.osc.gz
+
+# You can put either set of commands into a script and cron it up, here's the script for the osm2pgsql route
+
+#!/bin/sh
+n=`ps -ef | grep -v grep | grep /opt/osmosis-0.41/ | wc -l`
+m=`ps -ef | grep -v grep | grep /opt/osm2pgsql/ | wc -l`
+let i=n+m
+if [ $i -gt 0 ]; then
+ echo osmosis or osm2pgsql running
+else
+ echo not running
+ /opt/osmosis-0.41/bin/osmosis --rri workingDirectory=/tmp/osm/planet/replication --simplify-change --write-xml-change /tmp/osm/planet/replication/changes.osc.gz
+ /opt/osm2pgsql/osm2pgsql --append -S /opt/osm2pgsql/default.style -d osm -U postgres --slim /tmp/osm/planet/replication/changes.osc.gz
+fi
+
+# Now you're probably running mod_tile and mapnik to render and serve up OSM tiles so we need a method to tell mod_tile to re-render all tiles that have updates. We can amend the osm2pgsql call with -e options to produce a list of tiles that need to be expired and thus re-rendered. [See OSM Tile Expire Methods].
+# change the osm2pgsql command to read
+ /opt/osm2pgsql/osm2pgsql --append -S /opt/osm2pgsql/default.style -d osm -U postgres --slim /tmp/osm/planet/replication/changes.osc.gz -e15 -o expire.list
+
+# We now expire all tiles listed in the expire.list. I haven't included the install and setup of Mapnik or mod_tile so i'm going to use some dummy locations for them. I'm expiring tiles from zoom level 6 and downwards
+cat expire.list | /opt/mapnik/mod_tile/render_expired --map=osm --min-zoom=6 --touch-from=7 >/dev/null
+
+# The OSM Tile Expire Methods guide also recommends a daily re-render of the lower zoom levels.
+* Using PGRouting from Python
+
 * Introduction to C#/.NET
 The Itinero/OpenLR library is written in C#. To build software using it, you'll need a C# SDK, which can be downloaded from Microsoft: [[https://www.microsoft.com/net/learn/get-started][Get started with .NET]]
 
