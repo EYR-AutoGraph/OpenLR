@@ -21,7 +21,7 @@ PostGIS is built on top of PostgreSQL, which is considered to be the most versat
 **** Creating a PostGIS/pgRouting database
 First we have to create the database.
 #+BEGIN_SRC sql
-create database autograph;
+create database "autograph";
 #+END_SRC
 
 Then connect to the new database, either by typing "=\c autograph=" in the =psql= prompt, or from the shell:
@@ -48,6 +48,7 @@ Use Osmosis to load OSM data into the database
 #+BEGIN_SRC shell
 osmosis --rb file=netherlands-latest.osm.pbf --ws host="localhost" database="autograph"
 #+END_SRC
+Take a cup of coffee. In fact, go on a hiking trip through the Alps to arrive in northern Italy, find a nice espresso bar, have some good coffee.
 **** Keeping PostGIS up-to-date
 
 *** PGRouting
@@ -145,6 +146,8 @@ fi
 cat expire.list | /opt/mapnik/mod_tile/render_expired --map=osm --min-zoom=6 --touch-from=7 >/dev/null
 
 # The OSM Tile Expire Methods guide also recommends a daily re-render of the lower zoom levels.
+#+END_QUOTE
+
 * Using PGRouting from Python
 
 * Introduction to C#/.NET
