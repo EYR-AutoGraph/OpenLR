@@ -48,10 +48,56 @@ Use Osmosis to load OSM data into the database
 #+BEGIN_SRC shell
 osmosis --rb file=netherlands-latest.osm.pbf --ws host="localhost" database="autograph"
 #+END_SRC
-Take a cup of coffee. In fact, go on a hiking trip through the Alps to arrive in northern Italy, find a nice espresso bar, have some good coffee.
+Take a cup of coffee. In fact, go on a hiking trip through the Alps to arrive in northern Italy, find a nice espresso bar, have some good coffee. Doing this with the Luxembourg dataset takes about one minute on a laptop, all of the Netherlands may take more than two hours.
+
+**** Second way of loading OSM data into PostGIS
+Download a =osm.bz2= file. Run the following command:
+
+#+BEGIN_SRC shell
+osm2pgsql -d luxembourg -U postgres -P 5432 luxembourg-latest.osm.bz2
+#+END_SRC
+
+This loads the data in a schema that QGis also understands, and is faster than using =osmosis=.
+
 **** Keeping PostGIS up-to-date
 
-*** PGRouting
+*** Performance
+Here are some tips on setting cache sizes: [[https://postgis.net/docs/performance_tips.html#database_tuning_configuration]]
+
+** PGRouting
+PGRouting is a routing framework on top of PostGIS. For PGRouting to work, the road network needs to have a suitable network topology defined. One way to achieve this, is to import the OSM data using the =osm2pgrouting= command. This command is not as flexible with data formats as =osm2pgsql= or =osmosis=, and reads the data as unpacked XML =osm= file. This means the size of the data that can be imported in one go is limited.
+
+For any real use, it is probably more practical to define the routing topology on top of an OSM map imported with =osm2pgsql=.
+
+*** Create a network topology
+Suppose we have created a database before, then we can add the topology as follows:
+
+#+BEGIN_SRC sql
+-- Add "source" and "target" column
+ALTER TABLE planet_osm_roads ADD COLUMN "source" integer;
+ALTER TABLE planet_osm_roads ADD COLUMN "target" integer;
+
+-- Run topology function
+SELECT pgr_createTopology('planet_osm_roads', 0.00001, 'way', 'osm_id');
+#+END_SRC
+
+Take a cup of coffee, doctor's orders. This operation takes a lot of memory too. Using the OSM data for the Netherlands, this took everything out of my laptop with 16GB memory and 32GB swap, but it made it!
+
+#+BEGIN_SRC
+NOTICE:  -------------> TOPOLOGY CREATED FOR  163889 edges
+#+END_SRC
+
+Unfortunately, these are the wrong 'roads'. We need to work with =planet_osm_lines=, which is a much bigger dataset. First create a table that contains only the roads.
+
+#+BEGIN_SRC sql
+create table "ways_topology" as
+select "osm_id" from "planet_osm_line"
+where "highway" is not null;
+#+END_SRC
+
+From this we can create a view containing only the necessary information for displaying the new table.
+
+
 ** QGIS
 *** Getting a pre-rendered OSM into QGIS
 Add a new layer. Set layer source to:
@@ -63,6 +109,60 @@ The CRS will be EPSG:3857, WGS 84 / Pseudo Mercator.
 Connecting to PostGIS is one of the better ways to provide QGIS with large amounts of data. The elephant logo button hides the action of adding a new source from PostGIS to the current rendering.
 
 ** Open Street Maps
+*** Data description
+OSM Data consists of points, lines and polygons. There is a fourth class of objects called /roads/. These are not roads. They are the major set of lines needed to depict an overview map, containing rivers, administrative boundaries and, yes, also some major roads.
+
+
+To get to the road network we need to filter the /lines/ for a valid /highway/ entry. The list of values for the /highway/ column is given on the [[https://wiki.openstreetmap.org/wiki/Key:highway][OSM Wiki]].
+
+Not all OSM editors adhere to these standards. If we query for all unique values in the Netherlands,
+
+#+BEGIN_SOURCE: sql
+select distinct "highway" from "planet_osm_line";
+#+END_SOURCE
+
+one entry in the Netherlands says "Luchtfoto suggereert hier een pad" (Dutch for: "Areal photo suggests a trail here").
+
+*** Highways
+| key     | value          | description                           0 |
+|         |                | <25>                      |
+|---------+----------------+---------------------------|
+| highway | motorway       | A restricted access major divided highway, normally with 2 or more running lanes plus emergency hard shoulder. Equivalent to the Freeway, Autobahn, etc.. |
+| highway | trunk          | The most important roads in a country's system that aren't motorways. (Need not necessarily be a divided highway.) |
+| highway | primary        | The next most important roads in a country's system. (Often link larger towns.) |
+| highway | secondary      | The next most important roads in a country's system. (Often link towns.) |
+| highway | tertiary       | The next most important roads in a country's system. (Often link smaller towns and villages) |
+| highway | unclassified   | The least most important through roads in a country's system – i.e. minor roads of a lower classification than tertiary, but which serve a purpose other than access to properties. Often link villages and hamlets. (The word 'unclassified' is a historical artefact of the UK road system and does not mean that the classification is unknown; you can use highway=road for that.) |
+| highway | residential    | Roads which serve as an access to housing, without function of connecting settlements. Often lined with housing. |
+| highway | service        | For access roads to, or within an industrial estate, camp site, business park, car park etc. Can be used in conjunction with service=* to indicate the type of usage and with access=* to indicate who can use it and in what circumstances. |
+| highway | motorway_link  | The link roads (sliproads/ramps) leading to/from a motorway from/to a motorway or lower class highway. Normally with the same motorway restrictions. |
+| highway | trunk_link     | The link roads (sliproads/ramps) leading to/from a trunk road from/to a trunk road or lower class highway. |
+| highway | primary_link   | The link roads (sliproads/ramps) leading to/from a primary road from/to a primary road or lower class highway. |
+| highway | secondary_link | The link roads (sliproads/ramps) leading to/from a secondary road from/to a secondary road or lower class highway. |
+| highway | tertiary_link  | The link roads (sliproads/ramps) leading to/from a tertiary road from/to a tertiary road or lower class highway. |
+| highway | living_street  | For living streets, which are residential streets where pedestrians have legal priority over cars, speeds are kept very low and where children are allowed to play on the street. |
+| highway | pedestrian     | For roads used mainly/exclusively for pedestrians in shopping and some residential areas which may allow access by motorised vehicles only for very limited periods of the day. To create a 'square' or 'plaza' create a closed way and tag as pedestrian and also with area=yes. |
+| highway | track          | Roads for mostly agricultural or forestry uses. To describe the quality of a track, see tracktype=*. Note: Although tracks are often rough with unpaved surfaces, this tag is not describing the quality of a road but its use. Consequently, if you want to tag a general use road, use one of the general highway values instead of track. |
+| highway | bus_guideway   | A busway where the vehicle guided by the way (though not a railway) and is not suitable for other traffic. Please note: this is not a normal bus lane, use access=no, psv=yes instead! |
+| highway | escape         | For runaway truck ramps, runaway truck lanes, emergency escape ramps, or truck arrester beds. It enables vehicles with braking failure to safely stop. |
+| highway | raceway        | A course or track for (motor) racing |
+| highway | road           | A road/way/street/motorway/etc. of unknown type. It can stand for anything ranging from a footpath to a motorway. This tag should only be used temporarily until the road/way/etc. has been properly surveyed. If you do know the road type, do not use this value, instead use one of the more specific highway=* values. |
+| highway | footway        | For designated footpaths; i.e., mainly/exclusively for pedestrians. This includes walking tracks and gravel paths. If bicycles are allowed as well, you can indicate this by adding a bicycle=yes tag. Should not be used for paths where the primary or intended usage is unknown. Use highway=pedestrian for pedestrianised roads in shopping or residential areas and highway=track if it is usable by agricultural or similar vehicles. |
+| highway | bridleway      | For horses. Equivalent to highway=path + horse=designated. |
+| highway | steps          | For flights of steps (stairs) on footways. Use with step_count=* to indicate the number of steps |
+| highway | path           | A non-specific path. Use highway=footway for paths mainly for walkers, highway=cycleway for one also usable by cyclists, highway=bridleway for ones available to horses as well as walkers and highway=track for ones which is passable by agriculture or similar vehicles. |
+| highway | cycleway       | For designated cycleways. Add foot=* only if default-access-restrictions do not apply. |
+
+We can put these values into a table in our database and use the following query to create a new table with only the desired roads.
+
+#+BEGIN_SRC: sql
+create table "ways" as
+  select "osm_id", "highway", "way"
+  from "planet_osm_line"
+  where "highway" in
+    (select "value" from "highway_values");
+#+END_SRC
+
 *** Osmosis
 Osmosis is a command-line tool to manipulate/filter/extract OSM data.
 
@@ -149,6 +249,13 @@ cat expire.list | /opt/mapnik/mod_tile/render_expired --map=osm --min-zoom=6 --t
 #+END_QUOTE
 
 * Using PGRouting from Python
+There is a Python package to access the PGRouting database: [[https://github.com/herrkaefer/psycopgr][=psycopgr=]]. It has a tutorial.
+** Installing
+With any Python installation, just type:
+
+#+BEGIN_SRC shell
+pip install psycopgr
+#+END_SRC
 
 * Introduction to C#/.NET
 The Itinero/OpenLR library is written in C#. To build software using it, you'll need a C# SDK, which can be downloaded from Microsoft: [[https://www.microsoft.com/net/learn/get-started][Get started with .NET]]
