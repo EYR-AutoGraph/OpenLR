@@ -1,4 +1,4 @@
-#+TITLE: Getting started with .NET OpenLR
+#+TITLE: Getting OpenLR to work
 Documentation on using OpenLR.
 
 * Generics of handling routing data
